@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma" // Isso criará os arquivos em src/generated/prisma/
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  cpf       String?
+  phone     String?
+  birthdate String?
+  addresses Address[]
+  createdAt DateTime @default(now())
+  favorites Favorite[]
+}
+
+model Address {
+  id           String  @id @default(uuid())
+  street       String
+  number       String
+  complement   String?
+  neighborhood String
+  city         String
+  state        String
+  zipCode      String  
+  userId       String
+  user         User    @relation(fields: [userId], references: [id])
+  isPrimary    Boolean @default(false)
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String   // Nome do Produto (vindo do Web)
+  description String
+  price       Float
+  stock       Int
+  category    String
+  image       String   // Imagem principal para o App Mobile
+  images      String[] // Galeria de fotos (Cloudinary)
+  variations  String[]
+  rating      Float    @default(5.0)
+  reviews     Int      @default(0)
+  sold        Int      @default(0)
+  createdAt   DateTime @default(now())
+  favorites   Favorite[]
+}
+
+model Order {
+  id            String   @id @default(uuid())
+  customerId    String
+  total         Float
+  paymentMethod String
+  addressId     String
+  status        String   @default("A Enviar")
+  date          DateTime @default(now())
+  items         OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  name      String
+  quantity  Int
+  price     Float
+  image     String
+  order     Order   @relation(fields: [orderId], references: [id])
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  userId    String   // ID do utilizador (do AuthContext)
+  productId String
+  name      String
+  price     Float
+  quantity  Int
+  image     String
+  createdAt DateTime @default(now())
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  user      User     @relation(fields: [userId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId]) // Impede que o mesmo usuário favorite o mesmo produto duas vezes
+}
