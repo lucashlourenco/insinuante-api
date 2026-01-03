@@ -82,7 +82,8 @@ app.post('/auth/register', async (req, res) => {
 app.post('/auth/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await prisma.user.findFirst({
-        where: { email, password } // Em produção, use bcrypt para comparar hashes!
+        where: { email, password },
+        include: { shop: true } // 👈 IMPORTANTE: Inclui os dados da loja no retorno
     });
 
     if (!user) return res.status(401).json({ error: "Credenciais inválidas" });
@@ -92,12 +93,12 @@ app.post('/auth/login', async (req, res) => {
 // --- ROTA DE TESTE (Para saber se o server está vivo) ---
 app.get('/', (req, res) => res.send('Backend Insinuante está ON! ✅'));
 
-// --- ROTA DEFINITIVA DE CADASTRO DE PRODUTO ---
+
 app.post('/products', upload.array('files'), async (req, res) => {
     console.log('--- Nova tentativa de cadastro recebida ---');
 
     try {
-        const { name, description, price, stock, category, variations } = req.body;
+        const { name, description, price, stock, category, variations, shopId } = req.body;
         const files = req.files as Express.Multer.File[];
 
         if (!files || files.length === 0) {
@@ -121,11 +122,11 @@ app.post('/products', upload.array('files'), async (req, res) => {
                 category,
                 image: imageUrls.length > 0 ? imageUrls[0] : 'https://placehold.co/400',
                 images: imageUrls,
-                variations: variations ? JSON.parse(variations) : []
+                variations: variations ? JSON.parse(variations) : [],
+                shopId: shopId // 👈 Vincula o produto à loja do vendedor
             }
         });
 
-        console.log('✅ Produto cadastrado com sucesso:', product.id);
         res.status(201).json(product);
     } catch (error) {
         console.error('❌ Erro no cadastro:', error);
@@ -133,12 +134,26 @@ app.post('/products', upload.array('files'), async (req, res) => {
     }
 });
 
-// Listagem para o App Mobile
 app.get('/products', async (req, res) => {
-    const products = await prisma.product.findMany({
-        orderBy: { createdAt: 'desc' }
-    });
-    res.json(products);
+    const { search, shopId } = req.query;
+
+    try {
+        const products = await prisma.product.findMany({
+            where: {
+                ...(shopId ? { shopId: String(shopId) } : {}), // Filtra pela loja
+                ...(search ? {
+                    name: {
+                        contains: String(search),
+                        mode: 'insensitive',
+                    },
+                } : {}),
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(products);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao buscar produtos" });
+    }
 });
 
 // --- ROTA DE CRIAÇÃO DE PEDIDO (Checkout Mobile) ---
@@ -323,5 +338,31 @@ app.get('/favorites/details/:userId', async (req, res) => {
         res.json(favorites.map(f => f.product));
     } catch (error) {
         res.status(500).json({ error: "Erro ao buscar detalhes dos favoritos" });
+    }
+});
+
+
+app.get('/products', async (req, res) => {
+    const { search, shopId } = req.query; // Adicionamos shopId aos query params
+
+    try {
+        const products = await prisma.product.findMany({
+            where: {
+                // Filtra por shopId se ele for enviado
+                ...(shopId ? { shopId: String(shopId) } : {}),
+                // Mantém o filtro de busca por nome se houver
+                ...(search ? {
+                    name: {
+                        contains: String(search),
+                        mode: 'insensitive',
+                    },
+                } : {}),
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(products);
+    } catch (error) {
+        console.error("Erro ao buscar produtos:", error);
+        res.status(500).json({ error: "Erro ao buscar produtos" });
     }
 });
