@@ -1,4 +1,3 @@
-// insinuante-api/src/server.ts
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -7,7 +6,7 @@ import 'dotenv/config';
 
 // Importações com .js devido ao NodeNext
 import cloudinary from './lib/cloudinary.js';
-import { PrismaClient } from './generated/prisma/client.js';
+import { PrismaClient } from './generated/prisma/client/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 const app = express();
@@ -25,8 +24,20 @@ app.use(cors());
 app.use(express.json());
 
 
+// insinuante-api/src/server.ts
+
+// insinuante-api/src/server.ts
+
 app.post('/auth/register', async (req, res) => {
-    const { userData, addressData } = req.body;
+    // 1. Adicione este log para ver o que a Web está a enviar
+    console.log("📦 Dados recebidos no body:", JSON.stringify(req.body, null, 2));
+
+    const { userData, addressData, shopData } = req.body;
+
+    // Verificação de segurança
+    if (!userData || !userData.name) {
+        return res.status(400).json({ error: "Dados do usuário (nome, email) são obrigatórios." });
+    }
 
     try {
         const newUser = await prisma.user.create({
@@ -37,11 +48,11 @@ app.post('/auth/register', async (req, res) => {
                 cpf: userData.cpf,
                 phone: userData.phone,
                 birthdate: userData.birthdate,
+                role: userData.role || 'SELLER',
                 addresses: {
                     create: {
-                        // MAPEAMENTO EXATO DOS SEUS CAMPOS DO FRONTEND
-                        zipCode: addressData.cep,        // Front 'cep' -> DB 'zipCode'
-                        street: addressData.street,      // Front 'street' -> DB 'street'
+                        zipCode: addressData.cep,
+                        street: addressData.street,
                         number: addressData.number,
                         complement: addressData.complement,
                         neighborhood: addressData.neighborhood,
@@ -49,13 +60,21 @@ app.post('/auth/register', async (req, res) => {
                         state: addressData.state,
                         isPrimary: true
                     }
-                }
-            }
+                },
+                shop: shopData ? {
+                    create: {
+                        name: shopData.name,
+                        description: shopData.description,
+                        image: shopData.image || "https://placehold.co/400"
+                    }
+                } : undefined
+            },
+            include: { shop: true }
         });
         res.status(201).json(newUser);
     } catch (error) {
-        console.error("❌ Erro no Banco de Dados:", error);
-        res.status(400).json({ error: "Email já cadastrado ou erro nos campos de endereço." });
+        console.error("❌ Erro no Registo:", error);
+        res.status(400).json({ error: "Erro ao criar utilizador. Verifique se o email já existe." });
     }
 });
 
