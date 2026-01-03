@@ -23,11 +23,6 @@ const upload = multer({ dest: 'uploads/' });
 app.use(cors());
 app.use(express.json());
 
-
-// insinuante-api/src/server.ts
-
-// insinuante-api/src/server.ts
-
 app.post('/auth/register', async (req, res) => {
     // 1. Adicione este log para ver o que a Web está a enviar
     console.log("📦 Dados recebidos no body:", JSON.stringify(req.body, null, 2));
@@ -140,7 +135,7 @@ app.get('/products', async (req, res) => {
     try {
         const products = await prisma.product.findMany({
             where: {
-                ...(shopId ? { shopId: String(shopId) } : {}), // Filtra pela loja
+                ...(shopId ? { shopId: String(shopId) } : {}),
                 ...(search ? {
                     name: {
                         contains: String(search),
@@ -148,45 +143,79 @@ app.get('/products', async (req, res) => {
                     },
                 } : {}),
             },
+            // 👈 IMPORTANTE: Inclui os dados da loja associada ao produto
+            include: {
+                shop: true
+            },
             orderBy: { createdAt: 'desc' }
         });
         res.json(products);
     } catch (error) {
+        console.error("Erro ao buscar produtos:", error);
         res.status(500).json({ error: "Erro ao buscar produtos" });
     }
 });
 
-// --- ROTA DE CRIAÇÃO DE PEDIDO (Checkout Mobile) ---
-app.post('/orders', async (req, res) => {
+// Adicione também uma rota para buscar UM produto específico pelo ID
+app.get('/products/:id', async (req, res) => {
+    const { id } = req.params;
     try {
-        const { customerId, total, paymentMethod, addressId, items } = req.body;
+        const product = await prisma.product.findUnique({
+            where: { id },
+            include: { shop: true } // 👈 Traz o perfil do vendedor aqui também
+        });
+        res.json(product);
+    } catch (error) {
+        res.status(404).json({ error: "Produto não encontrado" });
+    }
+});
 
-        // Criamos o pedido e os itens do pedido em uma única transação
-        const order = await prisma.order.create({
-            data: {
-                customerId,
-                total,
-                paymentMethod,
-                addressId,
-                status: "A Enviar",
-                items: {
-                    create: items.map((item: any) => ({
-                        productId: item.id,
-                        name: item.name,
-                        quantity: item.quantity,
-                        price: item.price,
-                        image: item.image
-                    }))
+
+app.post('/orders', async (req, res) => {
+    const { customerId, total, paymentMethod, addressId, items } = req.body;
+
+    try {
+        // Usamos $transaction para que tudo aconteça ou nada aconteça
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Criar o Pedido
+            const order = await tx.order.create({
+                data: {
+                    customerId,
+                    total,
+                    paymentMethod,
+                    addressId,
+                    status: "A Enviar",
+                    items: {
+                        create: items.map((item: any) => ({
+                            productId: item.id,
+                            name: item.name,
+                            quantity: item.quantity,
+                            price: item.price,
+                            image: item.image
+                        }))
+                    }
                 }
-            },
-            include: { items: true }
+            });
+
+            // 2. Baixar o estoque de cada produto
+            for (const item of items) {
+                await tx.product.update({
+                    where: { id: item.id },
+                    data: {
+                        stock: { decrement: item.quantity }, // Diminui a quantidade exata
+                        sold: { increment: item.quantity }   // Aumenta o contador de vendas
+                    }
+                });
+            }
+
+            return order;
         });
 
-        console.log(`📦 Novo pedido recebido! ID: ${order.id}`);
-        res.status(201).json(order);
+        console.log(`✅ Pedido ${result.id} finalizado com baixa de estoque.`);
+        res.status(201).json(result);
     } catch (error) {
-        console.error("❌ Erro ao processar pedido:", error);
-        res.status(500).json({ error: "Erro ao fechar pedido" });
+        console.error("❌ Erro no checkout:", error);
+        res.status(500).json({ error: "Erro ao processar pagamento ou falta de estoque." });
     }
 });
 
@@ -272,24 +301,6 @@ app.get('/orders/customer/:customerId', async (req, res) => {
     }
 });
 
-app.get('/products', async (req, res) => {
-    const { search } = req.query; // Pega o termo de busca da URL: ?search=...
-
-    try {
-        const products = await prisma.product.findMany({
-            where: search ? {
-                name: {
-                    contains: String(search), // Busca produtos que contenham o termo
-                    mode: 'insensitive',      // Ignora maiúsculas/minúsculas
-                },
-            } : {},
-            orderBy: { createdAt: 'desc' }
-        });
-        res.json(products);
-    } catch (error) {
-        res.status(500).json({ error: "Erro ao buscar produtos" });
-    }
-});
 
 app.listen(3333, '0.0.0.0', () => {
     console.log(`🔥 Insinuante-API rodando em http://localhost:${PORT}`);
@@ -341,28 +352,14 @@ app.get('/favorites/details/:userId', async (req, res) => {
     }
 });
 
-
-app.get('/products', async (req, res) => {
-    const { search, shopId } = req.query; // Adicionamos shopId aos query params
-
+app.get('/addresses/user/:userId', async (req, res) => {
+    const { userId } = req.params;
     try {
-        const products = await prisma.product.findMany({
-            where: {
-                // Filtra por shopId se ele for enviado
-                ...(shopId ? { shopId: String(shopId) } : {}),
-                // Mantém o filtro de busca por nome se houver
-                ...(search ? {
-                    name: {
-                        contains: String(search),
-                        mode: 'insensitive',
-                    },
-                } : {}),
-            },
-            orderBy: { createdAt: 'desc' }
+        const addresses = await prisma.address.findMany({
+            where: { userId }
         });
-        res.json(products);
+        res.json(addresses);
     } catch (error) {
-        console.error("Erro ao buscar produtos:", error);
-        res.status(500).json({ error: "Erro ao buscar produtos" });
+        res.status(500).json({ error: "Erro ao buscar endereços" });
     }
 });
