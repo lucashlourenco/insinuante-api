@@ -3,6 +3,10 @@ import cors from 'cors';
 import multer from 'multer';
 import { Pool } from 'pg';
 import 'dotenv/config';
+import Stripe from 'stripe';
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2025-12-15.clover'
+});
 
 // Importações com .js devido ao NodeNext
 import cloudinary from './lib/cloudinary.js';
@@ -361,5 +365,21 @@ app.get('/addresses/user/:userId', async (req, res) => {
         res.json(addresses);
     } catch (error) {
         res.status(500).json({ error: "Erro ao buscar endereços" });
+    }
+});
+
+app.post('/payments/intent', async (req, res) => {
+    const { amount } = req.body; // Valor em cêntimos (ex: R$ 10,00 = 1000)
+
+    try {
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount,
+            currency: 'brl',
+            payment_method_types: ['card'],
+        });
+
+        res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (e: any) {
+        res.status(400).json({ error: e.message });
     }
 });
