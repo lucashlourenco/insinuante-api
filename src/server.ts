@@ -82,7 +82,7 @@ app.post('/auth/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await prisma.user.findFirst({
         where: { email, password },
-        include: { shop: true } // 👈 IMPORTANTE: Inclui os dados da loja no retorno
+        include: { shop: true } 
     });
 
     if (!user) return res.status(401).json({ error: "Credenciais inválidas" });
@@ -381,5 +381,73 @@ app.post('/payments/intent', async (req, res) => {
         res.json({ clientSecret: paymentIntent.client_secret });
     } catch (e: any) {
         res.status(400).json({ error: e.message });
+    }
+});
+
+
+app.get('/seller/stats/:shopId', async (req, res) => {
+    const { shopId } = req.params;
+
+    try {
+        const orders = await prisma.order.findMany({
+            where: {
+                items: {
+                    some: {
+                        product: { 
+                            shopId: shopId
+                        }
+                    }
+                }
+            },
+            select: {
+                status: true
+            }
+        });
+
+        // Contabilizamos os totais por status
+        const stats = {
+            aPagar: orders.filter(o => o.status === 'A Pagar').length,
+            aEnviar: orders.filter(o => o.status === 'A Enviar').length,
+            enviado: orders.filter(o => o.status === 'Enviando').length,
+            cancelado: orders.filter(o => o.status === 'Cancelado').length,
+        };
+
+        res.json(stats);
+    } catch (error) {
+        console.error("Erro ao buscar estatísticas:", error);
+        res.status(500).json({ error: "Erro ao carregar dados do dashboard" });
+    }
+});
+
+
+app.get('/seller/sales-chart/:shopId', async (req, res) => {
+    const { shopId } = req.params;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    try {
+        const orders = await prisma.order.findMany({
+            where: {
+                date: { gte: sevenDaysAgo }, // 👈 Alterado de createdAt para date
+                items: { some: { product: { shopId: shopId } } }
+            },
+            select: { total: true, date: true } // 👈 Alterado de createdAt para date
+        });
+
+        const chartData = Array.from({ length: 7 }).map((_, i) => {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateString = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+            const dayTotal = orders
+                .filter(o => o.date.toLocaleDateString() === date.toLocaleDateString()) // 👈 Alterado para o.date
+                .reduce((sum, o) => sum + o.total, 0);
+
+            return { name: dateString, sales: dayTotal };
+        }).reverse();
+
+        res.json(chartData);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao gerar dados do gráfico" });
     }
 });

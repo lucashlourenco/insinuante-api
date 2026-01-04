@@ -54,7 +54,7 @@ model Address {
 }
 
 model Product {
-  id          String     @id @default(uuid())
+  id          String      @id @default(uuid())
   name        String
   description String
   price       Float
@@ -63,12 +63,13 @@ model Product {
   image       String
   images      String[]
   variations  String[]
-  rating      Float      @default(5.0)
-  reviews     Int        @default(0)
-  sold        Int        @default(0)
+  rating      Float       @default(5.0)
+  reviews     Int         @default(0)
+  sold        Int         @default(0)
   shopId      String? // 👈 ID da loja para o Prisma
-  shop        Shop?      @relation(fields: [shopId], references: [id]) // 👈 Relação
-  createdAt   DateTime   @default(now())
+  shop        Shop?       @relation(fields: [shopId], references: [id]) // 👈 Relação
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
   favorites   Favorite[]
 }
 
@@ -84,14 +85,15 @@ model Order {
 }
 
 model OrderItem {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   orderId   String
   productId String
+  product   Product @relation(fields: [productId], references: [id])
   name      String
   quantity  Int
   price     Float
   image     String
-  order     Order  @relation(fields: [orderId], references: [id])
+  order     Order   @relation(fields: [orderId], references: [id])
 }
 
 model CartItem {

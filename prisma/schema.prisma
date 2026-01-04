@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js" // 👈 Corrigido: deve ser prisma-client-js
-  output   = "../src/generated/prisma/client" 
+  output   = "../src/generated/prisma/client"
 }
 
 datasource db {
@@ -14,17 +14,17 @@ enum Role {
 }
 
 model User {
-  id        String    @id @default(uuid())
+  id        String     @id @default(uuid())
   name      String
-  email     String    @unique
+  email     String     @unique
   password  String
-  role      Role      @default(CUSTOMER) // 👈 Campo que estava faltando
-  shop      Shop?     // 👈 Relação com a loja
+  role      Role       @default(CUSTOMER) // 👈 Campo que estava faltando
+  shop      Shop? // 👈 Relação com a loja
   cpf       String?
   phone     String?
   birthdate String?
   addresses Address[]
-  createdAt DateTime  @default(now())
+  createdAt DateTime   @default(now())
   favorites Favorite[]
 }
 
@@ -47,39 +47,40 @@ model Address {
   neighborhood String
   city         String
   state        String
-  zipCode      String  
+  zipCode      String
   userId       String
   user         User    @relation(fields: [userId], references: [id])
   isPrimary    Boolean @default(false)
 }
 
 model Product {
-  id          String   @id @default(uuid())
-  name        String   
+  id          String      @id @default(uuid())
+  name        String
   description String
   price       Float
   stock       Int
   category    String
-  image       String   
-  images      String[] 
+  image       String
+  images      String[]
   variations  String[]
-  rating      Float    @default(5.0)
-  reviews     Int      @default(0)
-  sold        Int      @default(0)
-  shopId      String?  // 👈 ID da loja para o Prisma
-  shop        Shop?    @relation(fields: [shopId], references: [id]) // 👈 Relação
-  createdAt   DateTime @default(now())
+  rating      Float       @default(5.0)
+  reviews     Int         @default(0)
+  sold        Int         @default(0)
+  shopId      String? // 👈 ID da loja para o Prisma
+  shop        Shop?       @relation(fields: [shopId], references: [id]) // 👈 Relação
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
   favorites   Favorite[]
 }
 
 model Order {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   customerId    String
   total         Float
   paymentMethod String
   addressId     String
-  status        String   @default("A Enviar")
-  date          DateTime @default(now())
+  status        String      @default("A Enviar")
+  date          DateTime    @default(now())
   items         OrderItem[]
 }
 
@@ -87,6 +88,7 @@ model OrderItem {
   id        String  @id @default(uuid())
   orderId   String
   productId String
+  product   Product @relation(fields: [productId], references: [id])
   name      String
   quantity  Int
   price     Float
@@ -96,7 +98,7 @@ model OrderItem {
 
 model CartItem {
   id        String   @id @default(uuid())
-  userId    String   
+  userId    String
   productId String
   name      String
   price     Float
