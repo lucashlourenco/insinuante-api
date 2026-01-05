@@ -1,3 +1,4 @@
+import fs from 'fs';
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -12,6 +13,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 import cloudinary from './lib/cloudinary.js';
 import { PrismaClient } from './generated/prisma/client/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
+
 
 const app = express();
 const PORT = 3333;
@@ -305,6 +307,31 @@ app.get('/orders/customer/:customerId', async (req, res) => {
     }
 });
 
+// Rota para Upload Único de Imagem (Perfil da Loja, etc)
+app.post('/upload', upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+        }
+
+        console.log('📤 Fazendo upload da imagem para o Cloudinary...');
+
+        // 1. Envia o arquivo que o multer salvou na pasta 'uploads/' para o Cloudinary
+        const result = await cloudinary.uploader.upload(req.file.path, {
+            folder: 'insinuante_profile', // Organiza em uma pasta específica
+        });
+
+        // 2. Apaga o arquivo temporário da sua pasta 'uploads/' local
+        fs.unlinkSync(req.file.path);
+
+        // 3. Retorna a URL segura para o Frontend
+        res.json({ url: result.secure_url });
+    } catch (error) {
+        console.error('❌ Erro no upload:', error);
+        res.status(500).json({ error: 'Erro ao processar upload da imagem.' });
+    }
+});
+
 
 app.listen(3333, '0.0.0.0', () => {
     console.log(`🔥 Insinuante-API rodando em http://localhost:${PORT}`);
@@ -529,5 +556,34 @@ app.patch('/orders/:id/status', async (req, res) => {
         res.json(updatedOrder);
     } catch (error) {
         res.status(500).json({ error: "Erro ao atualizar status do pedido" });
+    }
+});
+
+// Rota para buscar os dados atuais da loja
+app.get('/shops/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const shop = await prisma.shop.findUnique({
+            where: { id }
+        });
+        res.json(shop);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao buscar perfil da loja" });
+    }
+});
+
+// Rota para atualizar os dados da loja
+app.put('/shops/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, description, image } = req.body;
+
+    try {
+        const updatedShop = await prisma.shop.update({
+            where: { id },
+            data: { name, description, image }
+        });
+        res.json(updatedShop);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao atualizar perfil" });
     }
 });
