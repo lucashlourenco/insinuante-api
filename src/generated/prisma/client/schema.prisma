@@ -26,6 +26,7 @@ model User {
   addresses Address[]
   createdAt DateTime   @default(now())
   favorites Favorite[]
+  orders    Order[]
 }
 
 model Shop {
@@ -76,6 +77,7 @@ model Product {
 model Order {
   id            String      @id @default(uuid())
   customerId    String
+  customer      User        @relation(fields: [customerId], references: [id])
   total         Float
   paymentMethod String
   addressId     String

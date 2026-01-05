@@ -451,3 +451,44 @@ app.get('/seller/sales-chart/:shopId', async (req, res) => {
         res.status(500).json({ error: "Erro ao gerar dados do gráfico" });
     }
 });
+
+// insinuante-api/src/server.ts
+
+app.get('/seller/income/:shopId', async (req, res) => {
+    const { shopId } = req.params;
+
+    try {
+        const orders = await prisma.order.findMany({
+            where: {
+                items: {
+                    some: {
+                        product: { shopId: shopId }
+                    }
+                }
+            },
+            include: {
+                customer: { select: { name: true } } // Para exibir o nome do comprador
+            },
+            orderBy: { date: 'desc' }
+        });
+
+        // Mapeia os dados para o formato esperado pelo frontend
+        const incomeData = orders.map(order => {
+            const netAmount = order.total * 0.90; // Subtrai 10% de comissão
+            
+            return {
+                id: order.id,
+                orderId: `#${order.id.split('-')[0].toUpperCase()}`,
+                date: new Date(order.date).toLocaleDateString('pt-BR'),
+                buyerName: order.customer?.name || 'Comprador',
+                amount: netAmount,
+                // Lógica de Liberação: Apenas pedidos "Concluído" são liberados
+                status: order.status === 'Concluído' ? 'Liberado' : 'Pendente'
+            };
+        });
+
+        res.json(incomeData);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao carregar dados financeiros" });
+    }
+});
