@@ -669,3 +669,64 @@ app.delete('/products/:id', async (req, res) => {
         res.status(500).json({ error: "Erro ao excluir o produto. Verifique se ele existe." });
     }
 });
+
+// Rota para Criar um Novo Endereço
+app.post('/addresses', async (req, res) => {
+    const { userId, zipCode, street, number, complement, neighborhood, city, state, isPrimary } = req.body;
+
+    try {
+        // Se este for marcado como principal, removemos o "principal" dos outros primeiro
+        if (isPrimary) {
+            await prisma.address.updateMany({
+                where: { userId },
+                data: { isPrimary: false }
+            });
+        }
+
+        const newAddress = await prisma.address.create({
+            data: {
+                userId, zipCode, street, number, complement, neighborhood, city, state, isPrimary: !!isPrimary
+            }
+        });
+        res.status(201).json(newAddress);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao cadastrar endereço." });
+    }
+});
+
+// Rota para Remover um Endereço
+app.delete('/addresses/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await prisma.address.delete({
+            where: { id }
+        });
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao remover endereço." });
+    }
+});
+
+// insinuante-api/src/server.ts
+
+app.put('/addresses/:id', async (req, res) => {
+    const { id } = req.params;
+    const { zipCode, street, number, complement, neighborhood, city, state, isPrimary, userId } = req.body;
+
+    try {
+        if (isPrimary) {
+            await prisma.address.updateMany({
+                where: { userId },
+                data: { isPrimary: false }
+            });
+        }
+
+        const updated = await prisma.address.update({
+            where: { id: id }, // Certifique-se que o id é string/number conforme o seu banco
+            data: { zipCode, street, number, complement, neighborhood, city, state, isPrimary }
+        });
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao atualizar endereço." });
+    }
+});
