@@ -452,8 +452,6 @@ app.get('/seller/sales-chart/:shopId', async (req, res) => {
     }
 });
 
-// insinuante-api/src/server.ts
-
 app.get('/seller/income/:shopId', async (req, res) => {
     const { shopId } = req.params;
 
@@ -490,5 +488,46 @@ app.get('/seller/income/:shopId', async (req, res) => {
         res.json(incomeData);
     } catch (error) {
         res.status(500).json({ error: "Erro ao carregar dados financeiros" });
+    }
+});
+
+// insinuante-api/src/server.ts
+
+// Rota para buscar todos os pedidos de uma loja específica
+app.get('/seller/orders/:shopId', async (req, res) => {
+    const { shopId } = req.params;
+
+    try {
+        const orders = await prisma.order.findMany({
+            where: {
+                items: {
+                    some: { product: { shopId: shopId } }
+                }
+            },
+            include: {
+                items: true,
+                customer: { select: { name: true } }
+            },
+            orderBy: { date: 'desc' }
+        });
+        res.json(orders);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao buscar pedidos" });
+    }
+});
+
+// Rota para atualizar o status do pedido (ex: Enviar Pedido)
+app.patch('/orders/:id/status', async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    try {
+        const updatedOrder = await prisma.order.update({
+            where: { id: id },
+            data: { status: status }
+        });
+        res.json(updatedOrder);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao atualizar status do pedido" });
     }
 });
