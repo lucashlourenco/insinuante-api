@@ -587,3 +587,68 @@ app.put('/shops/:id', async (req, res) => {
         res.status(500).json({ error: "Erro ao atualizar perfil" });
     }
 });
+
+// Rota para buscar dados de um utilizador específico
+app.get('/users/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id },
+            include: { shop: true }
+        });
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao buscar dados do utilizador" });
+    }
+});
+
+// Rota para atualizar os dados do utilizador
+app.put('/users/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, email, password, phone, birthdate } = req.body;
+
+    try {
+        const updatedUser = await prisma.user.update({
+            where: { id },
+            data: {
+                name,
+                email,
+                password, // Em produção, lembre-se de encriptar a senha
+                phone,
+                birthdate
+            },
+            include: { shop: true }
+        });
+        res.json(updatedUser);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Erro ao atualizar dados da conta" });
+    }
+});
+
+app.put('/products/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, description, price, stock, category, variations, images } = req.body;
+
+    try {
+        const product = await prisma.product.update({
+            where: { id },
+            data: {
+                name,
+                description,
+                price: parseFloat(price),
+                stock: parseInt(stock),
+                category,
+                // Aqui salvamos a lista de URLs (incluindo as que sobraram após a remoção)
+                images: images, 
+                image: images.length > 0 ? images[0] : 'https://placehold.co/400',
+                variations: variations ? (typeof variations === 'string' ? JSON.parse(variations) : variations) : []
+            }
+        });
+
+        res.json(product);
+    } catch (error) {
+        console.error("Erro ao atualizar produto:", error);
+        res.status(500).json({ error: "Erro ao atualizar o produto no banco de dados." });
+    }
+});
