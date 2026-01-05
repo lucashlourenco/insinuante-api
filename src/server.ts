@@ -652,3 +652,20 @@ app.put('/products/:id', async (req, res) => {
         res.status(500).json({ error: "Erro ao atualizar o produto no banco de dados." });
     }
 });
+
+app.delete('/products/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Remove o produto do banco de dados
+        await prisma.product.delete({
+            where: { id }
+        });
+
+        // 204 significa "Sucesso, mas sem conteúdo para retornar"
+        res.status(204).send();
+    } catch (error) {
+        console.error("❌ Erro ao deletar produto:", error);
+        res.status(500).json({ error: "Erro ao excluir o produto. Verifique se ele existe." });
+    }
+});
